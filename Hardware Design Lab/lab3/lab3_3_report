@@ -1,0 +1,134 @@
+`timescale 1ns / 1ps
+module clock_divider(clk,clk_div);
+    input clk;
+    output clk_div;
+    parameter n = 25;
+    reg[n-1:0]num;
+    wire[n-1:0]next_num;
+    always@(posedge clk)begin
+        num <= next_num;
+    end
+    assign next_num = num + 1;
+    assign clk_div = num[n-1];
+endmodule
+
+module lab3_3(
+    input clk,
+    input rst,
+    input en,
+    output [15:0] led
+);
+
+reg dir1=1'b0,next_dir1,dir11=1'b0,next_dir11,dir111=1'b1,next_dir111;
+reg [3:0] pos1=4'd15,next_pos1,pos11=4'd11,next_pos11,pos111=4'd2,next_pos111;  //pos1: *    ,pos11: * _    ,pos111: * _ _
+wire clk_div1,clk_div11,clk_div111;
+
+clock_divider #(24) div1(.clk(clk),.clk_div(clk_div1));  //fastest  //24,25,26
+clock_divider #(25) div2(.clk(clk),.clk_div(clk_div11));
+clock_divider #(26) div3(.clk(clk),.clk_div(clk_div111));  //slowest
+
+always@(posedge clk_div1 or posedge rst)begin  //fastest
+    if(rst) begin
+        dir1<=1'b0;  //right
+        pos1<=4'd15;
+    end else if(!en) begin
+        dir1<=dir1;
+        pos1<=pos1;
+    end else begin
+        dir1<=next_dir1;
+        pos1<=next_pos1;
+    end
+end
+
+always@(posedge clk_div11 or posedge rst)begin
+    if(rst) begin
+        dir11<=1'b0;  //right
+        pos11<=4'd11;
+    end else if(!en) begin
+        dir11<=dir11;
+        pos11<=pos11;
+    end else begin
+        dir11<=next_dir11;
+        pos11<=next_pos11;
+    end
+end
+
+always@(posedge clk_div111 or posedge rst)begin  //slowest
+    if(rst) begin
+        dir111<=1'b1;  //left
+        pos111<=4'd2;
+    end else if(!en) begin
+        dir111<=dir111;
+        pos111<=pos111;
+    end else begin
+        dir111<=next_dir111;
+        pos111<=next_pos111;
+    end
+end
+
+always@(*) begin
+    if(dir1==1'b1) begin  //default
+        next_pos1=pos1+1'b1;
+        next_dir1=dir1;
+    end else if(dir1==1'b0) begin
+        next_pos1=pos1-1'b1;
+        next_dir1=dir1;
+    end
+
+    if(pos1==4'd15 && pos1-pos11<=1) begin
+        next_pos1=pos1;
+        next_dir1=1'b0;
+    end else if(pos1==4'd15) begin
+        next_pos1=pos1-1'b1;
+        next_dir1=1'b0;
+    end else if(pos1-pos11<=1) begin
+        next_pos1=pos1+1'b1;
+        next_dir1=1'b1;
+    end
+end
+
+always@(*) begin
+    if(dir11==1'b1) begin  //default
+        next_pos11=pos11+1'b1;
+        next_dir11=dir11;
+    end else if(dir11==1'b0) begin
+        next_pos11=pos11-1'b1;
+        next_dir11=dir11;
+    end
+
+    if(pos1-pos11<=1 && pos11-pos111<=2) begin
+        next_pos11=pos11;  //stay
+        next_dir11=dir11;  //keep direction
+    end else if(pos1-pos11<=1) begin
+        next_pos11=pos11-1'b1;
+        next_dir11=1'b0;  //right
+    end else if(pos11-pos111<=2) begin
+        next_pos11=pos11+1'b1;
+        next_dir11=1'b1;  //left
+    end
+end
+
+always@(*) begin
+    if(dir111==1'b1) begin  //default
+        next_pos111=pos111+1'b1;
+        next_dir111=dir111;
+    end else if(dir111==1'b0) begin
+        next_pos111=pos111-1'b1;
+        next_dir111=dir111;
+    end
+
+    if(pos111==4'd2 && pos11-pos111<=2) begin
+        next_pos111=pos111;
+        next_dir111=1'b1;
+    end else if(pos111==4'd2) begin
+        next_pos111=pos111+1'b1;
+        next_dir111=1'b1;
+    end else if(pos11-pos111<=2) begin
+        next_pos111=pos111-1'b1;
+        next_dir111=1'b0;
+    end
+end
+
+assign led = (1'b1<<pos1 | 2'b11<<(pos11-1'd1) | 3'b111<<(pos111-2'd2));  //+
+
+endmodule
